@@ -22,37 +22,53 @@ import com.batman.dashboard.ui.music.MusicPlayerScreen
 import com.batman.dashboard.ui.wayne.WayneEnterprisesScreen
 
 @Composable
-fun BatmanNavigation() {
+fun BatmanNavigation(
+    isStealthMode: Boolean,
+    onToggleStealth: () -> Unit,
+    onThreatUpdate: (Float) -> Unit
+) {
     val context = LocalContext.current
     val app = context.applicationContext as BatmanApp
     val container = app.container
     val backStack = rememberNavBackStack(HomeKey)
 
     val missionsVm: MissionsViewModel = viewModel(factory = MissionsViewModel.factory(container.missionDao))
-    val commsVm: CommsViewModel = viewModel(factory = CommsViewModel.factory(container.messageDao))
-    val equipmentVm: EquipmentViewModel = viewModel(factory = EquipmentViewModel.factory(container.equipmentDao))
-    val mapVm: MapViewModel = viewModel(factory = MapViewModel.factory(container.crimePinDao))
-    val emergencyVm: EmergencyViewModel = viewModel(factory = EmergencyViewModel.factory(container.emergencyDao))
+    val commsVm:    CommsViewModel    = viewModel(factory = CommsViewModel.factory(container.messageDao))
+    val equipmentVm:EquipmentViewModel= viewModel(factory = EquipmentViewModel.factory(container.equipmentDao))
+    val mapVm:      MapViewModel      = viewModel(factory = MapViewModel.factory(container.crimePinDao))
+    val emergencyVm:EmergencyViewModel= viewModel(factory = EmergencyViewModel.factory(container.emergencyDao))
 
     NavDisplay(
         backStack = backStack,
-        onBack = { backStack.removeLastOrNull() },
+        onBack    = { backStack.removeLastOrNull() },
         entryProvider = entryProvider {
             entry<HomeKey> {
                 HomeScreen(
-                    missionDao = container.missionDao,
-                    crimePinDao = container.crimePinDao,
-                    onNavigate = { key -> backStack.add(key) }
+                    missionDao      = container.missionDao,
+                    crimePinDao     = container.crimePinDao,
+                    isStealthMode   = isStealthMode,
+                    onToggleStealth = onToggleStealth,
+                    onThreatUpdate  = onThreatUpdate,
+                    onNavigate      = { key -> backStack.add(key) }
                 )
             }
             entry<MissionsKey> {
                 MissionsScreen(viewModel = missionsVm, onBack = { backStack.removeLastOrNull() })
             }
             entry<CommsKey> {
-                CommsScreen(viewModel = commsVm, onAllyClick = { id, name -> backStack.add(ChatKey(id, name)) }, onBack = { backStack.removeLastOrNull() })
+                CommsScreen(
+                    viewModel    = commsVm,
+                    onAllyClick  = { id, name -> backStack.add(ChatKey(id, name)) },
+                    onBack       = { backStack.removeLastOrNull() }
+                )
             }
             entry<ChatKey> { key ->
-                ChatScreen(allyId = key.allyId, allyName = key.allyName, viewModel = commsVm, onBack = { backStack.removeLastOrNull() })
+                ChatScreen(
+                    allyId    = key.allyId,
+                    allyName  = key.allyName,
+                    viewModel = commsVm,
+                    onBack    = { backStack.removeLastOrNull() }
+                )
             }
             entry<EquipmentKey> {
                 EquipmentScreen(viewModel = equipmentVm, onBack = { backStack.removeLastOrNull() })

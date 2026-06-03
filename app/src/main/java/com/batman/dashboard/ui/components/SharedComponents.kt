@@ -1,6 +1,12 @@
 package com.batman.dashboard.ui.components
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -14,21 +20,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.batman.dashboard.ui.theme.*
 
-/**
- * Glassmorphism card with optional gold border glow
- */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 16.dp,
     borderColor: Color = GlassBorder,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         modifier = modifier
@@ -43,107 +44,97 @@ fun GlassCard(
                 brush = Brush.linearGradient(
                     colors = listOf(borderColor, borderColor.copy(alpha = 0.2f), borderColor)
                 ),
-                shape = RoundedCornerShape(cornerRadius)
+                shape = RoundedCornerShape(cornerRadius),
             )
             .padding(16.dp),
-        content = content
+        content = content,
     )
 }
 
-/**
- * Animated pulsing dot — used for status indicators and crime pins
- */
 @Composable
 fun PulseIndicator(
     color: Color,
     size: Dp = 12.dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 1f, targetValue = 0.2f,
+    val transition = rememberInfiniteTransition(label = "pulse")
+    val alpha by transition.animateFloat(
+        initialValue = 1f,
+        targetValue  = 0.2f,
         animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ), label = "alpha"
+            animation  = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "alpha",
     )
     Box(
         modifier = modifier
             .size(size)
             .drawBehind {
-                // Outer glow ring
                 drawCircle(color = color.copy(alpha = alpha * 0.4f), radius = size.toPx() * 0.9f)
-                // Inner solid dot
-                drawCircle(color = color, radius = size.toPx() * 0.4f)
+                drawCircle(color = color,                            radius = size.toPx() * 0.4f)
             }
     )
 }
 
-/**
- * Threat level bar — horizontal fill bar with color gradient based on level
- */
 @Composable
 fun ThreatLevelBar(
-    level: Float, // 0f-1f
+    level: Float,
     modifier: Modifier = Modifier,
-    label: String = "THREAT LEVEL"
+    label: String = "THREAT LEVEL",
 ) {
     val color = when {
         level > 0.8f -> BatRed
         level > 0.6f -> BatOrange
         level > 0.4f -> BatGold
-        else -> BatGreen
+        else         -> BatGreen
     }
-    val animatedLevel by animateFloatAsState(targetValue = level, animationSpec = tween(800), label = "threat")
-
+    val animatedLevel by animateFloatAsState(
+        targetValue   = level,
+        animationSpec = tween(800),
+        label         = "threat",
+    )
     Column(modifier = modifier) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, style = MaterialTheme.typography.labelMedium)
             Text("${(level * 100).toInt()}%", style = MaterialTheme.typography.labelLarge, color = color)
         }
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(Modifier.height(4.dp))
         Box(
-            modifier = Modifier
+            Modifier
                 .fillMaxWidth()
                 .height(6.dp)
                 .clip(RoundedCornerShape(3.dp))
                 .background(BatBorder)
         ) {
             Box(
-                modifier = Modifier
+                Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(animatedLevel)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(color.copy(alpha = 0.6f), color)
-                        )
-                    )
+                    .background(Brush.horizontalGradient(listOf(color.copy(alpha = 0.6f), color)))
             )
         }
     }
 }
 
-/**
- * Battery/fuel level indicator
- */
 @Composable
 fun BatteryBar(
-    level: Int,  // 0-100
+    level: Int,
     modifier: Modifier = Modifier,
-    label: String = ""
+    label: String = "",
 ) {
     val fraction = level / 100f
     val color = when {
         fraction < 0.2f -> BatRed
         fraction < 0.4f -> BatOrange
-        else -> BatGreen
+        else            -> BatGreen
     }
-    val animated by animateFloatAsState(targetValue = fraction, animationSpec = tween(600), label = "battery")
-
+    val animated by animateFloatAsState(
+        targetValue   = fraction,
+        animationSpec = tween(600),
+        label         = "battery",
+    )
     Column(modifier = modifier) {
         if (label.isNotEmpty()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -170,9 +161,6 @@ fun BatteryBar(
     }
 }
 
-/**
- * Section header with gold accent line
- */
 @Composable
 fun SectionHeader(title: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
@@ -182,21 +170,16 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier) {
             Modifier
                 .width(40.dp)
                 .height(2.dp)
-                .background(
-                    Brush.horizontalGradient(colors = listOf(BatGold, BatGold.copy(alpha = 0f)))
-                )
+                .background(Brush.horizontalGradient(listOf(BatGold, BatGold.copy(alpha = 0f))))
         )
     }
 }
 
-/**
- * Status chip badge
- */
 @Composable
 fun StatusChip(
     label: String,
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
@@ -204,7 +187,7 @@ fun StatusChip(
             .background(color.copy(alpha = 0.15f))
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(50))
             .padding(horizontal = 10.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = color)
     }

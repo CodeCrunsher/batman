@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.batman.dashboard.data.db.CrimePinEntity
 import com.batman.dashboard.ui.components.*
 import com.batman.dashboard.ui.theme.*
+import com.batman.dashboard.ui.components.DecryptionMinigameDialog
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Gotham City District Data
@@ -223,8 +224,19 @@ fun GothamMapScreen(
     onBack: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var showAddDialog by remember { mutableStateOf(false) }
+    var showAddDialog      by remember { mutableStateOf(false) }
     var pendingTapPosition by remember { mutableStateOf<Offset?>(null) }
+    var detectiveMode      by remember { mutableStateOf(false) }
+    var showMinigame       by remember { mutableStateOf(false) }
+    var strikeTarget       by remember { mutableStateOf<Offset?>(null) }
+
+    // Detective mode pulsing anim
+    val infiniteAnim = rememberInfiniteTransition(label = "detectivePulse")
+    val strikeRadius by infiniteAnim.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing)),
+        label = "strikeRadius"
+    )
 
     Scaffold(
         containerColor = BatBlack,
@@ -233,17 +245,40 @@ fun GothamMapScreen(
                 title = {
                     Column {
                         Text("GOTHAM CITY", style = MaterialTheme.typography.headlineLarge)
-                        Text("CRIME INTELLIGENCE MAP", style = MaterialTheme.typography.headlineSmall)
+                        Text(
+                            if (detectiveMode) "DETECTIVE MODE — ACTIVE" else "CRIME INTELLIGENCE MAP",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = if (detectiveMode) BatCyan else TextSecondary
+                        )
                     }
                 },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = BatGold) } },
                 actions = {
+                    // Detective Mode toggle
+                    IconButton(onClick = { detectiveMode = !detectiveMode }) {
+                        Icon(
+                            imageVector = if (detectiveMode) Icons.Default.Visibility else Icons.Default.RemoveRedEye,
+                            contentDescription = "Detective Mode",
+                            tint = if (detectiveMode) BatCyan else TextSecondary
+                        )
+                    }
                     IconButton(onClick = { showAddDialog = true }) {
                         Icon(Icons.Default.AddLocation, contentDescription = "Add Crime", tint = BatRed)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BatBlack)
             )
+        },
+        floatingActionButton = {
+            if (detectiveMode) {
+                ExtendedFloatingActionButton(
+                    onClick = { showMinigame = true },
+                    containerColor = BatCyan,
+                    contentColor = BatBlack,
+                    icon = { Icon(Icons.Default.GpsFixed, null) },
+                    text = { Text("PREDICT STRIKE", style = MaterialTheme.typography.labelLarge) }
+                )
+            }
         }
     ) { padding ->
         Column(
@@ -259,8 +294,11 @@ fun GothamMapScreen(
                     .padding(8.dp)
             ) {
                 GothamMapCanvas(
-                    pins = state.activePins,
-                    selectedPin = state.selectedPin,
+                    pins          = state.activePins,
+                    selectedPin   = state.selectedPin,
+                    detectiveMode = detectiveMode,
+                    strikeTarget  = strikeTarget,
+                    strikeRadius  = strikeRadius,
                     onPinTap = { viewModel.selectPin(it) },
                     onMapTap = { x, y ->
                         pendingTapPosition = Offset(x, y)
@@ -274,6 +312,23 @@ fun GothamMapScreen(
             // ── Legend ──
             CrimeLegend()
 
+            // ── Detective Mode info bar ──
+            if (detectiveMode) {
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                    borderColor = BatCyan.copy(alpha = 0.5f)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.RemoveRedEye, null, tint = BatCyan, modifier = Modifier.size(14.dp))
+                        Text(
+                            "DETECTIVE MODE: Neural pattern analysis enabled — ${state.activePins.size} anomalies tracked",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BatCyan
+                        )
+                    }
+                }
+            }
+
             // ── Crime list ──
             if (state.activePins.isNotEmpty()) {
                 Text(
@@ -284,7 +339,7 @@ fun GothamMapScreen(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(160.dp)
+                        .height(140.dp)
                         .padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -324,12 +379,30 @@ fun GothamMapScreen(
             }
         )
     }
+
+    // Predictive Strike Minigame
+    if (showMinigame) {
+        DecryptionMinigameDialog(
+            onDismiss = { showMinigame = false },
+            onSuccess = {
+                // Place a random predicted strike vector on the map
+                strikeTarget = Offset((0.3f..0.7f).random(), (0.3f..0.7f).random())
+                showMinigame = false
+            }
+        )
+    }
 }
+
+private fun ClosedFloatingPointRange<Float>.random(): Float =
+    start + (endInclusive - start) * kotlin.random.Random.nextFloat()
 
 @Composable
 fun GothamMapCanvas(
     pins: List<CrimePinEntity>,
     selectedPin: CrimePinEntity?,
+    detectiveMode: Boolean = false,
+    strikeTarget: Offset? = null,
+    strikeRadius: Float = 0f,
     onPinTap: (CrimePinEntity) -> Unit,
     onMapTap: (Float, Float) -> Unit,
     modifier: Modifier = Modifier
@@ -350,8 +423,12 @@ fun GothamMapCanvas(
     Canvas(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, BatGold.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-            .background(Color(0xFF060612))
+            .border(
+                1.dp,
+                if (detectiveMode) BatCyan.copy(alpha = 0.7f) else BatGold.copy(alpha = 0.3f),
+                RoundedCornerShape(12.dp)
+            )
+            .background(if (detectiveMode) Color(0xFF00080F) else Color(0xFF060612))
             .pointerInput(pins) {
                 detectTapGestures { tapOffset ->
                     val normX = tapOffset.x / size.width
@@ -522,12 +599,67 @@ fun GothamMapCanvas(
             }
         }
 
+        // ── Detective Mode overlay ──
+        if (detectiveMode) {
+            // Pixel grid
+            val gridStep = w / 20f
+            var gx = 0f
+            while (gx <= w) {
+                drawLine(BatCyan.copy(alpha = 0.04f), Offset(gx, 0f), Offset(gx, h), 0.5f)
+                gx += gridStep
+            }
+            var gy = 0f
+            while (gy <= h) {
+                drawLine(BatCyan.copy(alpha = 0.04f), Offset(0f, gy), Offset(w, gy), 0.5f)
+                gy += gridStep
+            }
+            // Neon-cyan highlight on district borders
+            for (district in GOTHAM_DISTRICTS) {
+                val path = Path().apply {
+                    val pts = district.polygon
+                    moveTo(pts[0].x * w, pts[0].y * h)
+                    for (i in 1 until pts.size) lineTo(pts[i].x * w, pts[i].y * h)
+                    close()
+                }
+                drawPath(path, color = BatCyan.copy(alpha = 0.18f), style = Stroke(width = 1f))
+            }
+            // Gold tunnel paths from Wayne Tower to each crime pin
+            val wayneTower = Offset(0.47f * w, 0.22f * h)
+            for (pin in pins) {
+                val pinPx = Offset(pin.mapX * w, pin.mapY * h)
+                drawLine(
+                    color = BatGold.copy(alpha = 0.25f),
+                    start = wayneTower,
+                    end   = pinPx,
+                    strokeWidth = 1.5f,
+                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f, 6f))
+                )
+            }
+            // Strike vector: pulsing dashed circle
+            strikeTarget?.let { st ->
+                val stPx = Offset(st.x * w, st.y * h)
+                val baseR = 35f
+                drawCircle(
+                    color  = BatGold.copy(alpha = (1f - strikeRadius) * 0.7f),
+                    radius = baseR + strikeRadius * 40f,
+                    center = stPx,
+                    style  = Stroke(
+                        width      = 2f,
+                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 5f))
+                    )
+                )
+                drawCircle(BatGold.copy(alpha = 0.9f), 6f, stPx)
+                drawCircle(BatGold.copy(alpha = 0.4f), 14f, stPx, style = Stroke(1f))
+            }
+        }
+
         // ── Compass Rose ──
         val cx = w - 28f
         val cy = h - 28f
-        drawLine(BatGold.copy(0.6f), Offset(cx, cy - 16f), Offset(cx, cy + 16f), 1.5f)
-        drawLine(BatGold.copy(0.6f), Offset(cx - 16f, cy), Offset(cx + 16f, cy), 1.5f)
-        drawCircle(BatGold.copy(0.3f), 18f, Offset(cx, cy), style = Stroke(1f))
+        val compassColor = if (detectiveMode) BatCyan else BatGold
+        drawLine(compassColor.copy(0.6f), Offset(cx, cy - 16f), Offset(cx, cy + 16f), 1.5f)
+        drawLine(compassColor.copy(0.6f), Offset(cx - 16f, cy), Offset(cx + 16f, cy), 1.5f)
+        drawCircle(compassColor.copy(0.3f), 18f, Offset(cx, cy), style = Stroke(1f))
     }
 }
 

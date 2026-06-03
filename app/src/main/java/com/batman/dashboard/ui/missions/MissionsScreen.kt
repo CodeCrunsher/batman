@@ -1,11 +1,11 @@
 package com.batman.dashboard.ui.missions
 
-import androidx.compose.animation.*
-import androidx.compose.foundation.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,7 +18,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.batman.dashboard.data.db.MissionEntity
-import com.batman.dashboard.ui.components.*
 import com.batman.dashboard.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -27,7 +26,7 @@ import java.util.*
 @Composable
 fun MissionsScreen(
     viewModel: MissionsViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -35,206 +34,264 @@ fun MissionsScreen(
         containerColor = BatBlack,
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text("MISSIONS", style = MaterialTheme.typography.headlineLarge)
-                        Text("& ACTIVE QUESTS", style = MaterialTheme.typography.headlineSmall)
-                    }
-                },
+                title = { Text("Missions", style = MaterialTheme.typography.headlineLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = BatGold)
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
-                actions = {
-                    IconButton(onClick = { viewModel.openAddDialog() }) {
-                        Icon(Icons.Default.Add, contentDescription = "Add Mission", tint = BatGold)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BatBlack)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor        = BatBlack,
+                    titleContentColor     = TextPrimary,
+                    navigationIconContentColor = TextSecondary,
+                ),
             )
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { viewModel.openAddDialog() },
+                onClick = viewModel::openAddDialog,
                 containerColor = BatGold,
-                contentColor = BatBlack
+                contentColor   = BatBlack,
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add")
+                Icon(Icons.Default.Add, contentDescription = "Add mission")
             }
-        }
+        },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
+                .padding(padding),
         ) {
-            // ── Filters ──
-            FilterRow(
-                selectedStatus = state.filterStatus,
-                onStatusChange = viewModel::setStatusFilter
+            state.networkError?.let { error ->
+                Surface(color = BatRedDark, modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(error, style = MaterialTheme.typography.bodySmall, color = TextPrimary)
+                        IconButton(
+                            onClick = viewModel::clearNetworkError,
+                            modifier = Modifier.size(20.dp),
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = TextSecondary)
+                        }
+                    }
+                }
+            }
+
+            StatusFilterRow(
+                selected  = state.filterStatus,
+                onChange  = viewModel::setStatusFilter,
+                modifier  = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            Spacer(Modifier.height(8.dp))
+
             PriorityFilterRow(
-                selectedPriority = state.filterPriority,
-                onPriorityChange = viewModel::setPriorityFilter
+                selected = state.filterPriority,
+                onChange = viewModel::setPriorityFilter,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp),
             )
-            Spacer(Modifier.height(12.dp))
+
+            HorizontalDivider(
+                modifier  = Modifier.padding(top = 12.dp),
+                thickness = 0.5.dp,
+                color     = BatBorder,
+            )
 
             if (state.missions.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = BatGreen, modifier = Modifier.size(48.dp))
-                        Spacer(Modifier.height(8.dp))
-                        Text("ALL CLEAR", style = MaterialTheme.typography.headlineMedium, color = BatGreen)
-                        Text("No missions match filters", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint     = TextDisabled,
+                            modifier = Modifier.size(40.dp),
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text("No missions", style = MaterialTheme.typography.titleLarge, color = TextSecondary)
+                        Text("No items match the current filters.", style = MaterialTheme.typography.bodySmall, color = TextDisabled)
                     }
                 }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyColumn {
                     items(state.missions, key = { it.id }) { mission ->
-                        MissionCard(
-                            mission = mission,
-                            onEdit = { viewModel.openEditDialog(mission) },
-                            onDelete = { viewModel.deleteMission(mission) },
-                            onStatusChange = { newStatus -> viewModel.updateMissionStatus(mission, newStatus) }
+                        MissionRow(
+                            mission      = mission,
+                            onEdit       = { viewModel.openEditDialog(mission) },
+                            onDelete     = { viewModel.deleteMission(mission) },
+                            onStatusChange = { viewModel.updateMissionStatus(mission, it) },
                         )
+                        HorizontalDivider(thickness = 0.5.dp, color = BatBorder)
                     }
-                    item { Spacer(Modifier.height(80.dp)) }
+                    item { Spacer(Modifier.height(88.dp)) }
                 }
             }
         }
     }
 
     if (state.isAddDialogOpen) {
-        AddEditMissionDialog(
-            existingMission = state.editingMission,
+        MissionDialog(
+            existing  = state.editingMission,
             onDismiss = viewModel::closeDialog,
-            onSave = viewModel::saveMission
+            onSave    = viewModel::saveMission,
         )
     }
 }
 
 @Composable
-fun FilterRow(selectedStatus: String, onStatusChange: (String) -> Unit) {
-    val statuses = listOf("ALL", "PENDING", "IN_PROGRESS", "COMPLETED")
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-        statuses.forEach { status ->
-            val selected = selectedStatus == status
+private fun StatusFilterRow(
+    selected: String,
+    onChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier              = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        listOf("ALL", "PENDING", "IN_PROGRESS", "COMPLETED").forEach { status ->
             FilterChip(
-                selected = selected,
-                onClick = { onStatusChange(status) },
-                label = { Text(status.replace("_", " "), style = MaterialTheme.typography.labelMedium) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = BatGold.copy(alpha = 0.2f),
-                    selectedLabelColor = BatGold
-                )
+                selected = selected == status,
+                onClick  = { onChange(status) },
+                label    = { Text(status.replace("_", " "), style = MaterialTheme.typography.labelMedium) },
+                colors   = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = BatSurfaceVar,
+                    selectedLabelColor     = TextPrimary,
+                ),
             )
         }
     }
 }
 
 @Composable
-fun PriorityFilterRow(selectedPriority: String, onPriorityChange: (String) -> Unit) {
-    val priorities = listOf("ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW")
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-        priorities.forEach { p ->
-            val selected = selectedPriority == p
-            val color = priorityColor(p)
+private fun PriorityFilterRow(
+    selected: String,
+    onChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier              = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        listOf("ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW").forEach { p ->
             FilterChip(
-                selected = selected,
-                onClick = { onPriorityChange(p) },
-                label = { Text(p, style = MaterialTheme.typography.labelMedium) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = color.copy(alpha = 0.2f),
-                    selectedLabelColor = color
-                )
+                selected = selected == p,
+                onClick  = { onChange(p) },
+                label    = { Text(p, style = MaterialTheme.typography.labelMedium) },
+                colors   = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = BatSurfaceVar,
+                    selectedLabelColor     = priorityColor(p),
+                ),
             )
         }
     }
 }
 
 @Composable
-fun MissionCard(
+private fun MissionRow(
     mission: MissionEntity,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onStatusChange: (String) -> Unit
+    onStatusChange: (String) -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
-    val pColor = priorityColor(mission.priority)
     val isCompleted = mission.status == "COMPLETED"
+    val priorityAccent = priorityColor(mission.priority)
 
-    GlassCard(
-        modifier = Modifier.fillMaxWidth(),
-        borderColor = pColor.copy(alpha = 0.3f)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEdit() }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        Row(verticalAlignment = Alignment.Top) {
-            // Priority strip
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(60.dp)
-                    .background(pColor, RoundedCornerShape(2.dp))
+        // Priority dot
+        Surface(
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .size(8.dp),
+            shape = androidx.compose.foundation.shape.CircleShape,
+            color = if (isCompleted) TextDisabled else priorityAccent,
+        ) {}
+
+        Spacer(Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text  = mission.title,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
+                ),
+                color    = if (isCompleted) TextDisabled else TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        mission.title,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            textDecoration = if (isCompleted) TextDecoration.LineThrough else null
-                        ),
-                        color = if (isCompleted) TextDisabled else TextPrimary,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Box {
-                        IconButton(onClick = { showMenu = true }, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = TextSecondary, modifier = Modifier.size(16.dp))
-                        }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false },
-                            containerColor = BatSurfaceVar
-                        ) {
-                            DropdownMenuItem(text = { Text("Edit", color = BatGold) }, onClick = { showMenu = false; onEdit() })
-                            DropdownMenuItem(text = { Text("Mark Complete", color = BatGreen) }, onClick = { showMenu = false; onStatusChange("COMPLETED") })
-                            DropdownMenuItem(text = { Text("Mark In Progress", color = BatCyan) }, onClick = { showMenu = false; onStatusChange("IN_PROGRESS") })
-                            DropdownMenuItem(text = { Text("Delete", color = BatRed) }, onClick = { showMenu = false; onDelete() })
-                        }
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
+            if (mission.description.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    mission.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    text     = mission.description,
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    StatusChip(mission.priority, pColor)
-                    StatusChip(mission.status.replace("_", " "), statusColor(mission.status))
-                    StatusChip(mission.category, BatCyan.copy(alpha = 0.7f))
-                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text  = mission.priority,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = priorityAccent,
+                )
+                Text("·", style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+                Text(
+                    text  = mission.status.replace("_", " "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = statusColor(mission.status),
+                )
                 mission.dueDate?.let { due ->
-                    Spacer(Modifier.height(4.dp))
-                    val dueFmt = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.getDefault()).format(Date(due))
-                    val isOverdue = due < System.currentTimeMillis() && !isCompleted
+                    val fmt = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(due))
+                    val overdue = due < System.currentTimeMillis() && !isCompleted
+                    Text("·", style = MaterialTheme.typography.labelSmall, color = TextDisabled)
                     Text(
-                        "⏰ $dueFmt",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isOverdue) BatRed else TextDisabled
+                        text  = fmt,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (overdue) BatRed else TextDisabled,
                     )
                 }
+            }
+        }
+
+        Box {
+            IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = "Options",
+                    tint     = TextDisabled,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            DropdownMenu(
+                expanded          = showMenu,
+                onDismissRequest  = { showMenu = false },
+                containerColor    = BatSurfaceVar,
+            ) {
+                DropdownMenuItem(
+                    text    = { Text("Edit", style = MaterialTheme.typography.bodyMedium) },
+                    onClick = { showMenu = false; onEdit() },
+                )
+                DropdownMenuItem(
+                    text    = { Text("Mark complete", style = MaterialTheme.typography.bodyMedium) },
+                    onClick = { showMenu = false; onStatusChange("COMPLETED") },
+                )
+                DropdownMenuItem(
+                    text    = { Text("Mark in progress", style = MaterialTheme.typography.bodyMedium) },
+                    onClick = { showMenu = false; onStatusChange("IN_PROGRESS") },
+                )
+                HorizontalDivider(color = BatBorder)
+                DropdownMenuItem(
+                    text    = { Text("Delete", style = MaterialTheme.typography.bodyMedium, color = BatRed) },
+                    onClick = { showMenu = false; onDelete() },
+                )
             }
         }
     }
@@ -242,89 +299,109 @@ fun MissionCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddEditMissionDialog(
-    existingMission: MissionEntity?,
+private fun MissionDialog(
+    existing: MissionEntity?,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, String, String, Long?) -> Unit
+    onSave: (String, String, String, String, String, Long?) -> Unit,
 ) {
-    var title by remember { mutableStateOf(existingMission?.title ?: "") }
-    var description by remember { mutableStateOf(existingMission?.description ?: "") }
-    var priority by remember { mutableStateOf(existingMission?.priority ?: "MEDIUM") }
-    var status by remember { mutableStateOf(existingMission?.status ?: "PENDING") }
-    var category by remember { mutableStateOf(existingMission?.category ?: "COMBAT") }
+    var title       by remember { mutableStateOf(existing?.title       ?: "") }
+    var description by remember { mutableStateOf(existing?.description ?: "") }
+    var priority    by remember { mutableStateOf(existing?.priority    ?: "MEDIUM") }
+    var status      by remember { mutableStateOf(existing?.status      ?: "PENDING") }
+    var category    by remember { mutableStateOf(existing?.category    ?: "COMBAT") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = BatSurfaceVar,
+        containerColor   = BatSurfaceVar,
         title = {
             Text(
-                if (existingMission != null) "EDIT MISSION" else "NEW MISSION",
-                style = MaterialTheme.typography.headlineLarge
+                if (existing != null) "Edit mission" else "New mission",
+                style = MaterialTheme.typography.headlineLarge,
+                color = TextPrimary,
             )
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
-                    value = title,
+                    value         = title,
                     onValueChange = { title = it },
-                    label = { Text("Mission Title", color = TextSecondary) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BatGold, unfocusedBorderColor = BatBorder, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
+                    label         = { Text("Title") },
+                    modifier      = Modifier.fillMaxWidth(),
+                    singleLine    = true,
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = BatGold,
+                        unfocusedBorderColor = BatBorder,
+                        focusedTextColor     = TextPrimary,
+                        unfocusedTextColor   = TextPrimary,
+                        focusedLabelColor    = BatGold,
+                        unfocusedLabelColor  = TextSecondary,
+                    ),
                 )
                 OutlinedTextField(
-                    value = description,
+                    value         = description,
                     onValueChange = { description = it },
-                    label = { Text("Description", color = TextSecondary) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BatGold, unfocusedBorderColor = BatBorder, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
+                    label         = { Text("Description") },
+                    modifier      = Modifier.fillMaxWidth(),
+                    minLines      = 2,
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = BatGold,
+                        unfocusedBorderColor = BatBorder,
+                        focusedTextColor     = TextPrimary,
+                        unfocusedTextColor   = TextPrimary,
+                        focusedLabelColor    = BatGold,
+                        unfocusedLabelColor  = TextSecondary,
+                    ),
                 )
-                Text("PRIORITY", style = MaterialTheme.typography.labelLarge)
+                Text("Priority", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("CRITICAL", "HIGH", "MEDIUM", "LOW").forEach { p ->
-                        val sel = priority == p
-                        val c = priorityColor(p)
                         FilterChip(
-                            selected = sel,
-                            onClick = { priority = p },
-                            label = { Text(p, style = MaterialTheme.typography.labelMedium) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = c.copy(alpha = 0.25f),
-                                selectedLabelColor = c
-                            )
+                            selected = priority == p,
+                            onClick  = { priority = p },
+                            label    = { Text(p, style = MaterialTheme.typography.labelMedium) },
+                            colors   = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = BatSurfaceVar,
+                                selectedLabelColor     = priorityColor(p),
+                            ),
                         )
                     }
                 }
-                Text("CATEGORY", style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                Text("Category", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+                Row(
+                    modifier              = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     listOf("RECON", "COMBAT", "INFILTRATION", "INVESTIGATION").forEach { cat ->
-                        val sel = category == cat
                         FilterChip(
-                            selected = sel,
-                            onClick = { category = cat },
-                            label = { Text(cat, style = MaterialTheme.typography.labelMedium) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = BatCyan.copy(alpha = 0.2f),
-                                selectedLabelColor = BatCyan
-                            )
+                            selected = category == cat,
+                            onClick  = { category = cat },
+                            label    = { Text(cat, style = MaterialTheme.typography.labelMedium) },
+                            colors   = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = BatSurfaceVar,
+                                selectedLabelColor     = TextPrimary,
+                            ),
                         )
                     }
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = { if (title.isNotBlank()) onSave(title, description, priority, status, category, null) },
-                colors = ButtonDefaults.buttonColors(containerColor = BatGold, contentColor = BatBlack)
+            TextButton(
+                onClick  = { if (title.isNotBlank()) onSave(title, description, priority, status, category, null) },
+                enabled  = title.isNotBlank(),
             ) {
-                Text(if (existingMission != null) "UPDATE" else "DEPLOY", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    if (existing != null) "Save" else "Add",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = BatGold,
+                )
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCEL", color = TextSecondary)
+                Text("Cancel", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
             }
-        }
+        },
     )
 }
 

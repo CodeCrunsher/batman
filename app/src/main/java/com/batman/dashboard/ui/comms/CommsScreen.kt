@@ -1,5 +1,6 @@
 package com.batman.dashboard.ui.comms
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -123,8 +124,9 @@ fun ChatScreen(
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    LaunchedEffect(messages.size, uiState.isTyping) {
+        val itemCount = messages.size + if (uiState.isTyping) 1 else 0
+        if (itemCount > 0) listState.animateScrollToItem(itemCount - 1)
     }
 
     Scaffold(
@@ -179,8 +181,7 @@ fun ChatScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // ── Uplink error banner ────────────────────────────────────────
-            uiState.uplinkError?.let { error ->
+            uiState.networkError?.let { error ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -194,7 +195,7 @@ fun ChatScreen(
                     Spacer(Modifier.width(8.dp))
                     Text(error, style = MaterialTheme.typography.labelSmall,
                         color = BatOrange, modifier = Modifier.weight(1f))
-                    IconButton(onClick = { viewModel.clearUplinkError() },
+                    IconButton(onClick = { viewModel.clearNetworkError() },
                         modifier = Modifier.size(24.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Dismiss",
                             tint = BatOrange, modifier = Modifier.size(14.dp))
@@ -209,6 +210,12 @@ fun ChatScreen(
                 item { Spacer(Modifier.height(8.dp)) }
                 items(messages, key = { it.id }) { msg ->
                     ChatBubble(message = msg)
+                }
+
+                if (uiState.isTyping) {
+                    item(key = "typing_indicator") {
+                        TypingBubble()
+                    }
                 }
                 item { Spacer(Modifier.height(8.dp)) }
             }
@@ -257,6 +264,72 @@ fun ChatBubble(message: MessageEntity) {
             }
             Spacer(Modifier.height(2.dp))
             Text(sdf.format(Date(message.timestamp)), style = MaterialTheme.typography.labelSmall, color = TextDisabled)
+        }
+    }
+}
+
+
+@Composable
+fun TypingBubble() {
+    val infiniteTransition = rememberInfiniteTransition(label = "typing")
+
+    @Composable
+    fun animatedAlpha(delayMs: Int): Float {
+        val alpha by infiniteTransition.animateFloat(
+            initialValue = 0.2f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = keyframes {
+                    durationMillis = 1200
+                    0.2f at 0
+                    1f at 300
+                    0.2f at 600
+                    0.2f at 1200
+                },
+                repeatMode = RepeatMode.Restart,
+                initialStartOffset = StartOffset(delayMs)
+            ),
+            label = "dot_alpha_$delayMs"
+        )
+        return alpha
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Box(
+            modifier = Modifier
+                .background(
+                    BatSurfaceVar,
+                    RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 4.dp)
+                )
+                .border(
+                    1.dp, BatBorder,
+                    RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 4.dp)
+                )
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Typing...",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.width(4.dp))
+                listOf(0, 300, 600).forEach { delay ->
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(
+                                BatGold.copy(alpha = animatedAlpha(delay)),
+                                CircleShape
+                            )
+                    )
+                }
+            }
         }
     }
 }

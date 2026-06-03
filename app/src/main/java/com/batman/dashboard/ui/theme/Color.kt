@@ -2,45 +2,49 @@ package com.batman.dashboard.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ── Core Gotham Palette ──
-val BatBlack       = Color(0xFF0A0A0F)
-val BatSurface     = Color(0xFF12121A)
-val BatSurfaceVar  = Color(0xFF1C1C28)
-val BatBorder      = Color(0xFF2A2A3A)
-val BatGold        = Color(0xFFF5C518)
-val BatGoldDark    = Color(0xFFB8920E)
-val BatGoldLight   = Color(0xFFFDD84A)
-val BatCyan        = Color(0xFF4FC3F7)
-val BatCyanDark    = Color(0xFF0288D1)
+// Backgrounds
+val BatBlack      = Color(0xFF000000)
+val BatSurface    = Color(0xFF0D0D0D)
+val BatSurfaceVar = Color(0xFF1A1A1A)
+val BatBorder     = Color(0xFF2C2C2C)
 
-// ── Status Colors ──
-val BatRed         = Color(0xFFFF3D3D)
-val BatRedDark     = Color(0xFFB71C1C)
-val BatOrange      = Color(0xFFFF8C00)
-val BatGreen       = Color(0xFF4CAF50)
-val BatGreenDark   = Color(0xFF1B5E20)
-val BatPurple      = Color(0xFF9C27B0)
-val BatYellow      = Color(0xFFFFEB3B)
+// Accent — muted warm slate (replaces neon gold)
+val BatGold       = Color(0xFFC8A951)
+val BatGoldDark   = Color(0xFF8A7235)
+val BatGoldLight  = Color(0xFFDEBA72)
 
-// ── Priority Colors ──
-val PriorityCritical = Color(0xFFFF1744)
-val PriorityHigh     = Color(0xFFFF6D00)
-val PriorityMedium   = Color(0xFFFFC400)
-val PriorityLow      = Color(0xFF69F0AE)
+// Secondary accent (replaces neon cyan) — kept for status only
+val BatCyan       = Color(0xFF607D8B)
+val BatCyanDark   = Color(0xFF37474F)
 
-// ── Crime Type Colors ──
-val CrimeRed       = Color(0xFFFF3D3D)   // Robbery
-val CrimeOrange    = Color(0xFFFF8C00)   // Assault
-val CrimePurple    = Color(0xFFCE93D8)   // Drug Trafficking
-val CrimeYellow    = Color(0xFFFFEB3B)   // Kidnapping
-val CrimeCyan      = Color(0xFF00E5FF)   // Terrorism
+// Status
+val BatRed        = Color(0xFFCF6679)
+val BatRedDark    = Color(0xFF7F2336)
+val BatOrange     = Color(0xFFB07040)
+val BatGreen      = Color(0xFF4E7A52)
+val BatGreenDark  = Color(0xFF2A4A2C)
+val BatPurple     = Color(0xFF6B4F72)
+val BatYellow     = Color(0xFFC8A951)
 
-// ── Text ──
-val TextPrimary    = Color(0xFFF0F0F0)
-val TextSecondary  = Color(0xFFAAAAAA)
-val TextDisabled   = Color(0xFF555566)
+// Priority
+val PriorityCritical = Color(0xFFCF6679)
+val PriorityHigh     = Color(0xFFB07040)
+val PriorityMedium   = Color(0xFFC8A951)
+val PriorityLow      = Color(0xFF4E7A52)
 
-// ── Glass ──
-val GlassWhite     = Color(0x14FFFFFF)
-val GlassGold      = Color(0x1AF5C518)
-val GlassBorder    = Color(0x33F5C518)
+// Crime map markers — desaturated to match palette
+val CrimeRed    = Color(0xFFCF6679)
+val CrimeOrange = Color(0xFFB07040)
+val CrimePurple = Color(0xFF6B4F72)
+val CrimeYellow = Color(0xFFC8A951)
+val CrimeCyan   = Color(0xFF607D8B)
+
+// Text
+val TextPrimary   = Color(0xFFEEEEEE)
+val TextSecondary = Color(0xFF888888)
+val TextDisabled  = Color(0xFF444444)
+
+// Surface overlays
+val GlassWhite  = Color(0x0FFFFFFF)
+val GlassGold   = Color(0x10C8A951)
+val GlassBorder = Color(0x20C8A951)

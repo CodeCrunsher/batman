@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.text.style.*
 import androidx.compose.ui.unit.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.batman.dashboard.data.db.EmergencyContactEntity
 import com.batman.dashboard.data.db.EmergencyLogEntity
 import com.batman.dashboard.ui.components.*
 import com.batman.dashboard.ui.theme.*
@@ -23,12 +24,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 val ALERT_TYPES = listOf(
-    "MEDICAL EMERGENCY",
-    "POLICE BACKUP",
-    "FIRE RESPONSE",
-    "TACTICAL SUPPORT",
-    "AIR SUPPORT",
-    "EVACUATION"
+    "MEDICAL EMERGENCY", "POLICE BACKUP", "FIRE RESPONSE",
+    "TACTICAL SUPPORT", "AIR SUPPORT", "EVACUATION"
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +48,18 @@ fun EmergencyScreen(
         label = "glow"
     )
 
+    // Show call dialog when a call is active
+    state.activeCall?.let { contact ->
+        CallDialog(
+            contact = contact,
+            durationSeconds = state.callDurationSeconds,
+            callMessages = state.callMessages,
+            chips = state.activeCallChips,
+            onChipClick = { chip -> viewModel.sendQuickMessage(chip) },
+            onEndCall = viewModel::endCall
+        )
+    }
+
     Scaffold(
         containerColor = BatBlack,
         topBar = {
@@ -70,7 +79,6 @@ fun EmergencyScreen(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Success notification
             if (state.showSuccess) {
                 item {
                     GlassCard(Modifier.fillMaxWidth(), borderColor = BatGreen.copy(0.6f)) {
@@ -85,7 +93,6 @@ fun EmergencyScreen(
                 }
             }
 
-            // Alert type selection
             item {
                 GlassCard(Modifier.fillMaxWidth()) {
                     Text("ALERT TYPE", style = MaterialTheme.typography.labelLarge)
@@ -111,14 +118,9 @@ fun EmergencyScreen(
                 }
             }
 
-            // SOS Button
             item {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     if (state.isSosActive) {
-                        // Countdown state
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(
                                 modifier = Modifier
@@ -133,12 +135,7 @@ fun EmergencyScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        state.sosCountdown.toString(),
-                                        style = MaterialTheme.typography.displayLarge,
-                                        color = BatRed,
-                                        fontSize = 56.sp
-                                    )
+                                    Text(state.sosCountdown.toString(), style = MaterialTheme.typography.displayLarge, color = BatRed, fontSize = 56.sp)
                                     Text("SENDING...", style = MaterialTheme.typography.labelMedium, color = BatRed)
                                 }
                             }
@@ -154,15 +151,12 @@ fun EmergencyScreen(
                             }
                         }
                     } else {
-                        // Ready state
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(
                                 modifier = Modifier
                                     .size(160.dp)
                                     .clickable { viewModel.triggerSOS() }
-                                    .drawBehind {
-                                        drawCircle(BatRed.copy(alpha = 0.08f), radius = size.minDimension * 0.65f)
-                                    }
+                                    .drawBehind { drawCircle(BatRed.copy(alpha = 0.08f), radius = size.minDimension * 0.65f) }
                                     .background(BatRed, CircleShape)
                                     .border(3.dp, BatRed.copy(0.5f), CircleShape),
                                 contentAlignment = Alignment.Center
@@ -173,24 +167,13 @@ fun EmergencyScreen(
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
-                            Text(
-                                "Tap to send ${state.selectedAlertType}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                "5-second countdown before dispatch",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextDisabled,
-                                textAlign = TextAlign.Center
-                            )
+                            Text("Tap to send ${state.selectedAlertType}", style = MaterialTheme.typography.bodySmall, color = TextSecondary, textAlign = TextAlign.Center)
+                            Text("5-second countdown before dispatch", style = MaterialTheme.typography.labelSmall, color = TextDisabled, textAlign = TextAlign.Center)
                         }
                     }
                 }
             }
 
-            // Active contacts
             item { SectionHeader("EMERGENCY CONTACTS", Modifier.fillMaxWidth()) }
             if (state.contacts.isEmpty()) {
                 item { Text("No contacts configured", style = MaterialTheme.typography.bodyMedium, color = TextDisabled) }
@@ -210,23 +193,165 @@ fun EmergencyScreen(
                                 Text(contact.role, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                                 Text(contact.phone, style = MaterialTheme.typography.bodySmall, color = TextDisabled)
                             }
-                            Icon(Icons.Default.Phone, null, tint = BatGreen, modifier = Modifier.size(20.dp))
+                            // Clickable phone icon → starts simulated call
+                            IconButton(onClick = { viewModel.startCall(contact) }) {
+                                Icon(Icons.Default.Phone, contentDescription = "Call ${contact.name}", tint = BatGreen)
+                            }
                         }
                     }
                 }
             }
 
-            // Recent alert log
             if (state.alertLog.isNotEmpty()) {
                 item { SectionHeader("RECENT ALERTS", Modifier.fillMaxWidth()) }
-                items(state.alertLog.take(5), key = { it.id }) { log ->
-                    AlertLogItem(log)
-                }
+                items(state.alertLog.take(5), key = { it.id }) { log -> AlertLogItem(log) }
             }
 
             item { Spacer(Modifier.height(24.dp)) }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CallDialog(
+    contact: EmergencyContactEntity,
+    durationSeconds: Int,
+    callMessages: List<CallMessage>,
+    chips: List<String>,
+    onChipClick: (String) -> Unit,
+    onEndCall: () -> Unit
+) {
+    val inf = rememberInfiniteTransition(label = "call")
+    val avatarScale by inf.animateFloat(
+        initialValue = 0.88f, targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "scale"
+    )
+    val glowAlpha by inf.animateFloat(
+        initialValue = 0.25f, targetValue = 0.65f,
+        animationSpec = infiniteRepeatable(tween(700, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "glow"
+    )
+
+    val minutes = durationSeconds / 60
+    val seconds = durationSeconds % 60
+    val timerText = "%02d:%02d".format(minutes, seconds)
+
+    val lastMsg = callMessages.lastOrNull()
+
+    AlertDialog(
+        onDismissRequest = onEndCall,
+        containerColor = BatSurface,
+        title = null,
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Status header
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    PulseIndicator(BatGreen, 8.dp)
+                    Text("ENCRYPTED CALL ACTIVE", style = MaterialTheme.typography.labelSmall, color = BatGreen)
+                }
+                Spacer(Modifier.height(20.dp))
+
+                // Pulsing avatar
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
+                        .graphicsLayer { scaleX = avatarScale; scaleY = avatarScale }
+                        .drawBehind {
+                            drawCircle(BatGreen.copy(alpha = glowAlpha * 0.4f), radius = size.minDimension * 0.65f)
+                            drawCircle(BatGreen.copy(alpha = glowAlpha * 0.15f), radius = size.minDimension * 0.85f)
+                        }
+                        .background(BatGreen.copy(0.15f), CircleShape)
+                        .border(2.dp, BatGreen.copy(0.6f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        contact.name.first().toString(),
+                        style = MaterialTheme.typography.displayMedium,
+                        color = BatGreen
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+
+                Text(contact.name, style = MaterialTheme.typography.titleLarge)
+                Text(contact.role, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                Spacer(Modifier.height(6.dp))
+
+                Text(timerText, style = MaterialTheme.typography.displaySmall, color = BatGold)
+                Text("CALL CONNECTED", style = MaterialTheme.typography.labelSmall, color = BatGold)
+
+                Spacer(Modifier.height(20.dp))
+
+                // Quick message chips (2x2 grid)
+                Text("QUICK MESSAGES", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                Spacer(Modifier.height(8.dp))
+                chips.chunked(2).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        row.forEach { chip ->
+                            FilterChip(
+                                selected = false,
+                                onClick = { onChipClick(chip) },
+                                label = { Text(chip, style = MaterialTheme.typography.labelSmall) },
+                                modifier = Modifier.weight(1f),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = BatSurfaceVar,
+                                    labelColor = TextPrimary
+                                )
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+
+                // Response from contact
+                if (lastMsg != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(BatGreen.copy(0.08f), RoundedCornerShape(8.dp))
+                            .border(1.dp, BatGreen.copy(0.25f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    ) {
+                        Column {
+                            Text(
+                                "\u201c${lastMsg.chip}\u201d",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = BatGold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                lastMsg.response,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextPrimary
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onEndCall,
+                colors = ButtonDefaults.buttonColors(containerColor = BatRed, contentColor = Color.White),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.CallEnd, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("END CALL", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    )
 }
 
 @Composable
